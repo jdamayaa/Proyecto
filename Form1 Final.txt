@@ -1,0 +1,110 @@
+from ._anvil_designer import Form1Template
+from anvil import *
+import plotly.graph_objects as go
+import anvil.tables as tables
+import anvil.tables.query as q
+from anvil.tables import app_tables
+import anvil.server
+import time
+from time import datetime
+
+class Form1(Form1Template):
+  def __init__(self, **properties):
+    self.init_components(**properties)
+    self.temperatura_set = 0
+    self.humedad_set = 0
+    self.actualizar_label_t()
+    self.actualizar_label_h()
+    self.y_values_temp = []
+    self.y_values_hum = []
+    self.x_values_temp = []
+    #fig = anvil.server.call('create_scatter_plot', self.x_values_temp, self.y_values_temp, self.y_values_hum)
+    #self.plot_2.figure = fig
+
+    self.actualizar_label_t()   
+    self.actualizar_label_h()  
+
+  def button_1_click(self, **event_args):
+    while True:
+      try:
+        # Llamamos a la función pico_fn1 en el servidor de Anvil
+        valores = anvil.server.call('pico_fn1')
+        #print(valores)
+        # Asegurarse de que los valores que vamos a utilizar sean válidos
+        if not valores or len(valores) < 3:
+          raise ValueError("La estructura de valores no es válida")
+
+        self.temperatura_set = valores[1]
+        self.humedad_set = valores[2]
+        self.label_4.text = f'{valores[0][-1][0]}'
+        self.label_2.text = f'{valores[0][-1][1]}°C'
+        self.label_9.text = f'{valores[0][-1][0]}'
+        self.label_13.text = f'{valores[0][-1][2]}%'
+
+        # Limpiar las listas
+        self.x_values_temp.clear()
+        self.y_values_temp.clear()
+        self.y_values_hum.clear()
+
+        # Procesar los valores
+        for item in valores:
+          if isinstance(item, list):
+            for subitem in item:
+              if isinstance(subitem, list) and len(subitem) > 0:
+                self.x_values_temp.append(subitem[0])  # Elemento en la posición [0][0][0]
+                self.y_values_temp.append(subitem[1])  # Elemento en la posición [0][0][1]
+                self.y_values_hum.append(subitem[2])  # Elemento en la posición [0][0][2]
+
+          # Actualizar las etiquetas y el gráfico
+          self.actualizar_label_t()   
+          self.actualizar_label_h()
+          self.actualizar_grafico()
+          # Esperar 60 segundos antes de continuar
+          time.sleep(120)
+
+      except Exception as e:
+        # Capturar cualquier error y mostrarlo en la consola (o en una alerta si prefieres)
+        print(f"Ocurrió un error: {e}")
+        #alert(f"Error: {e}", title="ERROR de comunicación con la Raspberry")
+        time.sleep(120)  # Esperar un tiempo antes de intentar nuevamente
+
+
+  def actualizar_grafico(self):
+    fig = anvil.server.call('create_scatter_plot', self.x_values_temp, self.y_values_temp,self.y_values_hum)
+    self.plot_2.figure = fig
+
+  def boton_setear_click(self, **event_args):
+    try:
+        # Llamamos a la función pico_fn en el servidor de Anvil
+      resultado = anvil.server.call('pico_fn', self.temperatura_set, self.humedad_set)
+      alert(resultado)
+
+    except Exception as e:
+        # Si ocurre un error, mostrar la alerta con el mensaje de error
+      alert(f"Error: {e}", title="ERROR al intentar setear valores")
+
+  def button_mas_temp_click(self, **event_args):
+    if self.temperatura_set < 100:
+      self.temperatura_set += 1
+      self.actualizar_label_t()
+
+  def button_menos_temp_click(self, **event_args):
+    if self.temperatura_set > 0:
+      self.temperatura_set -= 1
+      self.actualizar_label_t()
+
+  def button_menos_hum_click(self, **event_args):
+    if self.humedad_set > 0:
+      self.humedad_set -= 1
+      self.actualizar_label_h()
+
+  def button_mas_hum_click(self, **event_args):
+    if self.humedad_set < 100:
+      self.humedad_set += 1
+      self.actualizar_label_h()
+
+  def actualizar_label_t(self):
+    self.label_6.text = f'{self.temperatura_set}°C'
+
+  def actualizar_label_h(self):
+    self.label_7.text = f'{self.humedad_set} %'    
